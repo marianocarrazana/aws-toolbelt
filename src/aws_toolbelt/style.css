@@ -5,7 +5,11 @@
   border: solid green;
 }
 #logs {
-  height: 100%;
-  width: 75%;
   border: solid yellow;
+}
+#panel {
+  width: 25%;
+}
+#tools {
+  height: 3;
 }

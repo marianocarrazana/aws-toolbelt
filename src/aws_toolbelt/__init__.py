@@ -1,6 +1,6 @@
-from .main import ECSApp
+from .main import App
 
 
 def main() -> None:
-    app = ECSApp()
+    app = App()
     app.run()

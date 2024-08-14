@@ -1,8 +1,29 @@
+from typing import TYPE_CHECKING
+
 import boto3
+from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Label, ListItem, ListView, Log
+from textual.widgets import (
+    Button,
+    Footer,
+    Header,
+    Label,
+    ListItem,
+    ListView,
+    Log,
+    Select,
+)
+
+from .regions import AWS_REGIONS
+
+if TYPE_CHECKING:
+    from mypy_boto3_ecs import ECSClient
+    from mypy_boto3_logs import CloudWatchLogsClient
+
+ecs_client: "ECSClient" = boto3.client("ecs", region_name="us-east-1")
+logs_client: "CloudWatchLogsClient" = boto3.client("logs", region_name="us-east-1")
 
 
 class ECSClusterItem(ListItem):
@@ -17,7 +38,19 @@ class ECSServiceItem(ListItem):
         self.service_name = service_name
 
 
-class ECSApp(App):
+class RedeploytBtn(Button):
+    def __init__(self, label: str, **kargs):
+        super().__init__(label, **kargs)
+        self.cluster = ""
+        self.service = ""
+
+    def on_click(self) -> None:
+        ecs_client.update_service(
+            cluster=self.cluster, service=self.service, forceNewDeployment=True
+        )
+
+
+class App(App):
     CSS_PATH = "style.css"
     BINDINGS = [
         ("d", "toggle_dark", "Toggle dark mode"),
@@ -33,8 +66,16 @@ class ECSApp(App):
             Vertical(
                 ListView(ListItem(Label("Clusters")), id="clusters"),
                 ListView(ListItem(Label("Services")), id="services"),
+                id="panel",
             ),
-            Log(id="logs", highlight=True),
+            Vertical(
+                Horizontal(
+                    RedeploytBtn("Redeploy"),
+                    Select([(line["name"], line["id"]) for line in AWS_REGIONS],prompt="Region"),
+                    id="tools",
+                ),
+                Log(id="logs", highlight=True),
+            ),
         )
         yield Footer()
 
@@ -42,7 +83,6 @@ class ECSApp(App):
         self.load_clusters()
 
     def load_clusters(self) -> None:
-        ecs_client = boto3.client("ecs")
         clusters = ecs_client.list_clusters()["clusterArns"]
         clusters_list = self.query_one("#clusters", ListView)
         clusters_list.clear()
@@ -51,7 +91,6 @@ class ECSApp(App):
 
     def load_services(self) -> None:
         if self.selected_cluster:
-            ecs_client = boto3.client("ecs")
             services = ecs_client.list_services(cluster=self.selected_cluster)[
                 "serviceArns"
             ]
@@ -60,17 +99,27 @@ class ECSApp(App):
             for service in services:
                 services_list.append(ECSServiceItem(service.split("/")[-1]))
 
+    @on(Select.Changed)
+    def select_changed(self, event: Select.Changed) -> None:
+        global ecs_client, logs_client
+        val = str(event.value)
+        self.title = val
+        ecs_client = boto3.client("ecs", region_name=val)
+        logs_client = boto3.client("logs", region_name=val)
+        self.load_clusters()
+
     def on_list_view_selected(self, event: ListView.Selected) -> None:
+        red_btn = self.query_one(RedeploytBtn)
         if isinstance(event.item, ECSClusterItem):
             self.selected_cluster = event.item.cluster_name
+            red_btn.cluster = event.item.cluster_name
             self.load_services()
         elif isinstance(event.item, ECSServiceItem):
             self.selected_service = event.item.service_name
+            red_btn.service = event.item.service_name
             self.load_logs()
 
     def get_log_group_name(self, cluster_name: str, service_name: str) -> str:
-        ecs_client = boto3.client("ecs")
-
         # Get the service details
         service = ecs_client.describe_services(
             cluster=cluster_name, services=[service_name]
@@ -92,7 +141,6 @@ class ECSApp(App):
 
     def load_logs(self) -> None:
         if self.selected_cluster and self.selected_service:
-            logs_client = boto3.client("logs")
             log_widget = self.query_one("#logs", Log)
             log_widget.clear()
 
@@ -129,5 +177,5 @@ class ECSApp(App):
 
 
 if __name__ == "__main__":
-    app = ECSApp(watch_css=True)
+    app = App()
     app.run()
