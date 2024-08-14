@@ -1,0 +1,24 @@
+[project]
+name = "aws-toolbelt"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Claudio Mariano Carrazana", email = "marianocarrazana@gmail.com"},
+]
+dependencies = [
+    "textual>=0.76.0",
+    "boto3>=1.34.160",
+]
+requires-python = ">=3.12"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[project.scripts]
+aws-toolbelt = "aws_toolbelt:main"

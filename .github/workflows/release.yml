@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  pypi-publish:
+    name: upload release to PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: pdm-project/setup-pdm@v2.7
+
+      - name: Publish package distributions to PyPI
+        id: publish_pypi
+        run: pdm publish
+
+      # - name: Create Github release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     # draft: true
+      #     prerelease: true
+      #     # generate_release_notes: true
+      #     body_path: CHANGELOG.md

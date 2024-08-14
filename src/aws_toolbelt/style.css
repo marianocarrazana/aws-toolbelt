@@ -1,0 +1,11 @@
+#clusters {
+  border: solid blue;
+}
+#services {
+  border: solid green;
+}
+#logs {
+  height: 100%;
+  width: 75%;
+  border: solid yellow;
+}
