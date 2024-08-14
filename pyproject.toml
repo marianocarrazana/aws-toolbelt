@@ -20,5 +20,10 @@ build-backend = "pdm.backend"
 [tool.pdm]
 distribution = true
 
+[tool.pdm.dev-dependencies]
+dev = [
+    "boto3-stubs[ecs,logs]>=1.34.160",
+]
+
 [project.scripts]
 aws-toolbelt = "aws_toolbelt:main"
