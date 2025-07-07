@@ -1,3 +1,4 @@
+# Predefined list of AWS regions used to populate the region selector.
 AWS_REGIONS = [
     {"id": "us-east-1", "name": "US East (N. Virginia)"},
     {"id": "us-east-2", "name": "US East (Ohio)"},

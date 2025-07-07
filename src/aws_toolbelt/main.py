@@ -1,3 +1,5 @@
+"""Textual TUI for inspecting and managing ECS services."""
+
 from typing import TYPE_CHECKING
 
 import boto3
@@ -22,35 +24,45 @@ if TYPE_CHECKING:
     from mypy_boto3_ecs import ECSClient
     from mypy_boto3_logs import CloudWatchLogsClient
 
+# Default clients used until the user selects another region
 ecs_client: "ECSClient" = boto3.client("ecs", region_name="us-east-1")
 logs_client: "CloudWatchLogsClient" = boto3.client("logs", region_name="us-east-1")
 
 
 class ECSClusterItem(ListItem):
+    """List item representing an ECS cluster."""
+
     def __init__(self, cluster_name: str, **kargs):
         super().__init__(Label(cluster_name), **kargs)
         self.cluster_name = cluster_name
 
 
 class ECSServiceItem(ListItem):
+    """List item representing an ECS service."""
+
     def __init__(self, service_name: str, **kargs):
         super().__init__(Label(service_name), **kargs)
         self.service_name = service_name
 
 
 class RedeploytBtn(Button):
+    """Button that triggers a redeploy of the selected service."""
+
     def __init__(self, label: str, **kargs):
         super().__init__(label, **kargs)
         self.cluster = ""
         self.service = ""
 
     def on_click(self) -> None:
+        """Force a new deployment using the selected cluster and service."""
         ecs_client.update_service(
             cluster=self.cluster, service=self.service, forceNewDeployment=True
         )
 
 
 class App(App):
+    """Main Textual application."""
+
     CSS_PATH = "style.css"
     BINDINGS = [
         ("d", "toggle_dark", "Toggle dark mode"),
@@ -61,6 +73,7 @@ class App(App):
     selected_service = reactive(None)
 
     def compose(self) -> ComposeResult:
+        """Compose the layout of the application."""
         yield Header()
         yield Horizontal(
             Vertical(
@@ -80,9 +93,11 @@ class App(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        """Load clusters when the app starts."""
         self.load_clusters()
 
     def load_clusters(self) -> None:
+        """Fetch and display all ECS clusters in the selected region."""
         clusters = ecs_client.list_clusters()["clusterArns"]
         clusters_list = self.query_one("#clusters", ListView)
         clusters_list.clear()
@@ -90,6 +105,7 @@ class App(App):
             clusters_list.append(ECSClusterItem(cluster.split("/")[-1]))
 
     def load_services(self) -> None:
+        """Fetch and display services for the selected cluster."""
         if self.selected_cluster:
             services = ecs_client.list_services(cluster=self.selected_cluster)[
                 "serviceArns"
@@ -101,6 +117,7 @@ class App(App):
 
     @on(Select.Changed)
     def select_changed(self, event: Select.Changed) -> None:
+        """Handle region selection changes by updating clients."""
         global ecs_client, logs_client
         val = str(event.value)
         self.title = val
@@ -109,6 +126,7 @@ class App(App):
         self.load_clusters()
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """Update state based on the selected cluster or service."""
         red_btn = self.query_one(RedeploytBtn)
         if isinstance(event.item, ECSClusterItem):
             self.selected_cluster = event.item.cluster_name
@@ -120,6 +138,8 @@ class App(App):
             self.load_logs()
 
     def get_log_group_name(self, cluster_name: str, service_name: str) -> str:
+        """Return the CloudWatch log group for a service."""
+
         # Get the service details
         service = ecs_client.describe_services(
             cluster=cluster_name, services=[service_name]
@@ -130,7 +150,7 @@ class App(App):
             taskDefinition=service["taskDefinition"]
         )["taskDefinition"]
 
-        # Find the log configuration
+        # Find the log configuration within the task definition
         for container_def in task_definition["containerDefinitions"]:
             if "logConfiguration" in container_def:
                 log_config = container_def["logConfiguration"]
@@ -140,6 +160,7 @@ class App(App):
         return ""
 
     def load_logs(self) -> None:
+        """Load CloudWatch logs for the selected service."""
         if self.selected_cluster and self.selected_service:
             log_widget = self.query_one("#logs", Log)
             log_widget.clear()
